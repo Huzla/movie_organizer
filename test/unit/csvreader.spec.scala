@@ -4,7 +4,7 @@ import java.nio.file._
 import java.io._
 
 import models.{CsvWritable, CsvReadable}
-import services.CsvReader
+import services.CsvReaderWrite
 import utils.InvalidFormatException
 
 // Define a test data model
@@ -40,8 +40,8 @@ object LongPost extends CsvReadable {
   }
 }
 
-class CsvReaderSpec extends PlaySpec with BeforeAndAfter {
-  var csvReader = new CsvReader()
+class CsvReaderWriteSpec extends PlaySpec with BeforeAndAfter {
+  var csvReader = new CsvReaderWrite()
   var tempDir: Path = null
   var testFilePath: String = ""
   var testFile: File = null
