@@ -3,23 +3,24 @@ import org.scalatestplus.play._
 import java.nio.file._
 import java.io._
 
-import models.{CsvWritable, CsvReadable}
-import services.CsvReaderWrite
+import models.CsvEncodable
+import services.CsvReaderWriter
 import utils.InvalidFormatException
 
 // Define a test data model
-case class Post(name: String, message: String) extends CsvWritable {
-  def toCsv() = {
-    return String.format("%s,%s", this.name, this.message)
+case class Post(name: String, message: String) extends CsvEncodable {
+  def toCsv(): String = {
+    return String.format("%s,%s\n", this.name, this.message)
   }
 }
 
-object Post extends CsvReadable {
-  def fromCsvString(csvStr: String): Post = {
+object Post {
+  @throws[InvalidFormatException]("if the string doesn't match data model")
+  def apply(csvStr: String): Post = {
     try {
       val splitArr = csvStr.split(",").map(_.trim)
 
-      return Post(splitArr[0], splitArr[1])
+      return Post(splitArr(0), splitArr(1))
     }
     catch {
       case e: Exception => throw InvalidFormatException(e.getMessage())
@@ -27,12 +28,19 @@ object Post extends CsvReadable {
   }
 }
 
-object LongPost extends CsvReadable {
-  def fromCsvString(csvStr: String): Post = {
+case class LongPost(name: String, message: String, extra: String) extends CsvEncodable {
+  def toCsv(): String = {
+    return String.format("%s,%s,%s\n", this.name, this.message, this.extra)
+  }
+}
+
+object LongPost {
+  @throws[InvalidFormatException]("if the string doesn't match data model")
+  def apply(csvStr: String): LongPost = {
     try {
       val splitArr = csvStr.split(",").map(_.trim)
 
-      return Post(splitArr[0], splitArr[1], splitArr[2])
+      return LongPost(splitArr(0), splitArr(1), splitArr(2))
     }
     catch {
       case e: Exception => throw InvalidFormatException(e.getMessage())
@@ -41,7 +49,8 @@ object LongPost extends CsvReadable {
 }
 
 class CsvReaderWriteSpec extends PlaySpec with BeforeAndAfter {
-  var csvReader = new CsvReaderWrite()
+  var csvReader = new CsvReaderWriter[Post]()
+  var csvReaderLong = new CsvReaderWriter[LongPost]()
   var tempDir: Path = null
   var testFilePath: String = ""
   var testFile: File = null
@@ -69,18 +78,18 @@ class CsvReaderWriteSpec extends PlaySpec with BeforeAndAfter {
   "CsvReader" should {
     
     "parse comma separated list files into Vector of given type" in {
-      assert(csvReader.read(testFilePath, Post) == validTestString.split("\n").map(nameAndMessage => {
+      assert(csvReader.read(testFilePath, Post.apply) == validTestString.split("\n").map(nameAndMessage => {
         val dataArr = nameAndMessage.split(",").map(_.trim)
         Post(dataArr(0), dataArr(1))
       }).toVector) 
     }
 
     "throw a file not found exception when the specified path does not match a file" in {
-      an [java.io.FileNotFoundException] must be thrownBy csvReader.read(tempDir, Post)
+      an [java.io.FileNotFoundException] must be thrownBy csvReader.read(tempDir.toString(), Post.apply)
     }
 
     "throw an invalid format exception when the read data does not mathc the data model" in {
-      an [InvalidFormatException] must be thrownBy csvReader.read(testFilePath, LongPost)
+      an [InvalidFormatException] must be thrownBy csvReaderLong.read(testFilePath, LongPost.apply)
     }
 
     "save changes to disk" in {
@@ -90,7 +99,7 @@ class CsvReaderWriteSpec extends PlaySpec with BeforeAndAfter {
       }).toVector :+ Post("Teppo testaaja", "Testaus on iloa")
 
       csvReader.save(testFilePath, testVector)
-      assert(csvReader.read(testFilePath, Post) == testVector) 
+      assert(csvReader.read(testFilePath, Post.apply) == testVector) 
     }
 
   }
